@@ -1,4 +1,4 @@
-﻿# Ysint - Modular OSINT Reconnaissance Toolkit
+# Ysint - Modular OSINT Reconnaissance Toolkit
 
 Toolkit Open Source Intelligence (OSINT) berbasis Python untuk melakukan footprinting dan reconnaissance terhadap nomor telepon, username, domain, alamat IP, email, dan subdomain secara komprehensif dengan dukungan pencarian database jejak publik dan validasi telekomunikasi.
 
@@ -30,7 +30,36 @@ Kloning repositori dan jalankan langsung:
 git clone https://github.com/yanzyuyu/Ysint.git
 cd Ysint
 pip install -r requirements.txt
-python main.py scan +628123456789
+python main.py phone +628123456789
+```
+
+```text
+$ python main.py phone +628123456789
+
+[*] Inspecting phone number '+628123456789'...
+
+--- Phone Intelligence: +628123456789 ---
+  International : +628123456789
+  National      : 08123456789
+  Country       : Indonesia (ID)
+  Calling Code  : +62
+  Region        : Southeast Asia
+  Timezone      : Asia/Jakarta
+  Carrier       : Telkomsel (Google libphonenumber)
+  Line Type     : Mobile
+
+--- Public Database & Leak Footprint ---
+  [+] Found 3 public web / caller record mentions:
+    - Ponimen 08123456789 / +628123456789 Jenis Panggilan:Peneror Nama Penelepon:Ponimen...
+    - Nomor (+) 628123456789 / 08123456789 statistik Terakhir dilihat...
+    - Nomor telepon 08123456789 telah dilaporkan lebih dari 11 kali oleh komunitas kami...
+
+--- OSINT Pivots & Identity Databases ---
+  WhatsApp Direct   : https://wa.me/628123456789
+  Telegram Direct   : https://t.me/+628123456789
+  Truecaller Recon  : https://www.truecaller.com/search/62/8123456789
+  Getcontact Lookup : https://www.getcontact.com/en/search?number=628123456789
+  Sync.ME Directory : https://sync.me/search/?number=628123456789
 ```
 
 ![Terminal Demo](terminal_demo.svg)
