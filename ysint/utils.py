@@ -3,8 +3,9 @@ import re
 import ssl
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
-from typing import Optional, Tuple, Dict, Any
+from typing import Optional, Tuple, Dict, Any, List
 
 def build_ssl_context() -> ssl.SSLContext:
     try:
@@ -39,6 +40,38 @@ def make_request(
         return exc.code, resp_headers, body
     except Exception:
         return 0, {}, b""
+
+def query_public_search(query_str: str, timeout: float = 6.0) -> List[Dict[str, str]]:
+    url = "https://lite.duckduckgo.com/lite/"
+    post_data = urllib.parse.urlencode({"q": query_str}).encode()
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    status, _, body = make_request(url, headers=headers, timeout=timeout, data=post_data)
+    if status != 200 or not body:
+        return []
+
+    html_text = body.decode("utf-8", errors="replace")
+    links = re.findall(r"<a[^>]+class=['\"]result-link['\"][^>]*href=['\"]([^'\"]+)['\"][^>]*>(.*?)</a>", html_text, re.DOTALL)
+    if not links:
+        links = re.findall(r"<a[^>]+href=['\"]([^'\"]+)['\"][^>]*class=['\"]result-link['\"][^>]*>(.*?)</a>", html_text, re.DOTALL)
+    snippets = re.findall(r"<td class=['\"]result-snippet['\"][^>]*>(.*?)</td>", html_text, re.DOTALL)
+
+    results = []
+    for i in range(min(len(links), len(snippets))):
+        raw_url, raw_title = links[i]
+        raw_snip = snippets[i]
+        clean_title = re.sub(r"<[^>]+>", "", raw_title).strip()
+        clean_title = re.sub(r"\s+", " ", clean_title)
+        clean_snip = re.sub(r"<[^>]+>", "", raw_snip).strip()
+        clean_snip = re.sub(r"\s+", " ", clean_snip)
+        if clean_snip and not any(r["url"] == raw_url for r in results):
+            results.append({
+                "title": clean_title,
+                "url": raw_url,
+                "snippet": clean_snip
+            })
+    return results
 
 def write_safe(text: str) -> None:
     encoding = sys.stdout.encoding or "utf-8"

@@ -22,7 +22,10 @@ Ysint dibangun untuk memberikan ringkasan intelijen yang cepat, akurat, terhubun
 - **Co-Hosted Domain Database & IP Intelligence**:
   - Database Reverse IP HackerTarget untuk mendeteksi domain-domain lain yang di-hosting pada alamat IP server target yang sama (shared hosting footprint).
   - Geolokasi presisi, ASN, ISP, organisasi pemilik IP, dan tautan pivot intelijen ancaman (Shodan, Censys, AbuseIPDB, GreyNoise, VirusTotal, BGP Route).
-- **Public Keyring & Identity Database for Email**:
+- **Live Data Breach & Infostealer Intelligence for Email**:
+  - Pemeriksaan kebocoran data langsung secara realtime menggunakan database global XposedOrNot untuk mendeteksi insiden breach riil tanpa memerlukan API key berbayar.
+  - Integrasi feed intelijen malware infostealer Hudson Rock untuk mendeteksi apakah email target pernah terinfeksi malware pencuri kredensial (RedLine, Lumma, Raccoon, Vidar), termasuk tanggal kompromi, sistem operasi, dan jumlah akun terdampak.
+  - Ekstraksi jejak kebocoran data publik dan pastebin secara otomatis dari mesin pencari.
   - Query ke direktori publik Ubuntu OpenPGP Keyring untuk mengekstraksi PGP Key ID, panjang bit kunci, dan tautan verifikasi identitas pengunggah kunci.
   - Validasi profil identitas Gravatar via hash kriptografis untuk mendeteksi keberadaan avatar dan akun publik terdaftar.
   - Database pengecekan domain disposable/burner email (80+ penyedia throwaway) dan validasi server penampung email (MX records).

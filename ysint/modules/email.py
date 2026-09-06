@@ -2,7 +2,7 @@ import hashlib
 import json
 import urllib.parse
 from typing import Dict, Any, List, Optional
-from ysint.utils import is_email, make_request
+from ysint.utils import is_email, make_request, query_public_search
 
 DISPOSABLE_DOMAINS = {
     "10minutemail.com", "guerrillamail.com", "mailinator.com", "tempmail.com",
@@ -68,6 +68,55 @@ def check_gravatar(email: str, timeout: float = 4.0) -> Dict[str, Any]:
         "hash": md5_hash
     }
 
+def check_xposedornot_breaches(email: str, timeout: float = 6.0) -> List[str]:
+    encoded = urllib.parse.quote(email)
+    url = f"https://api.xposedornot.com/v1/check-email/{encoded}"
+    status, _, body = make_request(url, timeout=timeout)
+    if status == 200 and body:
+        try:
+            data = json.loads(body.decode("utf-8", errors="replace"))
+            breaches = data.get("breaches", [])
+            if breaches and isinstance(breaches, list):
+                if isinstance(breaches[0], list):
+                    return breaches[0]
+                return breaches
+        except Exception:
+            pass
+    return []
+
+def check_hudsonrock_stealer(email: str, timeout: float = 6.0) -> Dict[str, Any]:
+    encoded = urllib.parse.quote(email)
+    url = f"https://cavalier.hudsonrock.com/api/json/v2/osint-tools/search-by-email?email={encoded}"
+    status, _, body = make_request(url, timeout=timeout)
+    if status == 200 and body:
+        try:
+            data = json.loads(body.decode("utf-8", errors="replace"))
+            stealers = data.get("stealers", [])
+            if stealers:
+                first = stealers[0]
+                return {
+                    "compromised": True,
+                    "total_services": data.get("total_user_services", 0) + data.get("total_corporate_services", 0),
+                    "date_compromised": first.get("date_compromised"),
+                    "os": first.get("operating_system"),
+                    "malware_path": first.get("malware_path"),
+                    "antiviruses": first.get("antiviruses", [])
+                }
+        except Exception:
+            pass
+    return {
+        "compromised": False,
+        "total_services": 0,
+        "date_compromised": None,
+        "os": None,
+        "malware_path": None,
+        "antiviruses": []
+    }
+
+def search_email_leak_footprint(email: str, timeout: float = 6.0) -> List[Dict[str, str]]:
+    query_str = f'"{email}" (site:pastebin.com OR site:github.com OR filetype:sql OR filetype:csv)'
+    return query_public_search(query_str, timeout=timeout)
+
 def scan_email(email_str: str, timeout: float = 5.0) -> Dict[str, Any]:
     clean_email = email_str.strip()
     if not is_email(clean_email):
@@ -85,6 +134,9 @@ def scan_email(email_str: str, timeout: float = 5.0) -> Dict[str, Any]:
 
     pgp_keys = check_pgp_keyserver(clean_email, timeout=timeout)
     gravatar_info = check_gravatar(clean_email, timeout=timeout)
+    breaches = check_xposedornot_breaches(clean_email, timeout=timeout)
+    stealer_info = check_hudsonrock_stealer(clean_email, timeout=timeout)
+    leak_mentions = search_email_leak_footprint(clean_email, timeout=timeout)
 
     return {
         "email": clean_email,
@@ -97,6 +149,9 @@ def scan_email(email_str: str, timeout: float = 5.0) -> Dict[str, Any]:
         "deliverable": can_receive_mail and not is_disposable,
         "pgp_keys": pgp_keys,
         "gravatar": gravatar_info,
+        "breaches": breaches,
+        "infostealer": stealer_info,
+        "leak_footprint": leak_mentions,
         "osint_pivots": {
             "haveibeenpwned": f"https://haveibeenpwned.com/account/{clean_email}",
             "intelx": f"https://intelx.io/?s={clean_email}",

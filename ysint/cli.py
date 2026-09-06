@@ -179,6 +179,40 @@ def format_email_report(data: Dict[str, Any]) -> None:
         print_header("Gravatar Public Identity Database")
         write_safe(f"  {CLR_GREEN}[+]{CLR_RESET} Registered Profile Avatar: {gravatar.get('avatar_url')}\n")
 
+    breaches = data.get("breaches", [])
+    if breaches:
+        print_header(f"Data Breach Exposures ({len(breaches)} incidents detected)")
+        write_safe(f"  {CLR_RED}[!] Target email found in {len(breaches)} public data breaches:{CLR_RESET}\n")
+        chunk = ", ".join(breaches[:15])
+        write_safe(f"  {chunk}\n")
+        if len(breaches) > 15:
+            write_safe(f"  ... and {len(breaches) - 15} more breaches.\n")
+    else:
+        print_header("Data Breach Exposure")
+        write_safe(f"  {CLR_GREEN}[+] No known public database breaches recorded for this email.{CLR_RESET}\n")
+
+    stealer = data.get("infostealer", {})
+    if stealer.get("compromised"):
+        print_header("Infostealer Malware Intelligence (Hudson Rock)")
+        write_safe(f"  {CLR_RED}[!] COMPROMISED: Associated computer was infected by info-stealer malware.{CLR_RESET}\n")
+        if stealer.get("date_compromised"):
+            write_safe(f"  Date Compromised    : {stealer.get('date_compromised')}\n")
+        if stealer.get("os"):
+            write_safe(f"  Victim Operating Sys: {stealer.get('os')}\n")
+        if stealer.get("total_services"):
+            write_safe(f"  Total Accounts Lost : {stealer.get('total_services')} credentials\n")
+        if stealer.get("malware_path"):
+            write_safe(f"  Malware Execution   : {stealer.get('malware_path')}\n")
+
+    leaks = data.get("leak_footprint", [])
+    if leaks:
+        print_header("Public Leaks & Pastebin Footprint")
+        write_safe(f"  {CLR_GREEN}[+] Found {len(leaks)} public leak / paste records:{CLR_RESET}\n")
+        for idx, lk in enumerate(leaks, 1):
+            write_safe(f"    [{idx}] {lk.get('title')}\n")
+            write_safe(f"        URL    : {lk.get('url')}\n")
+            write_safe(f"        Details: {lk.get('snippet')}\n")
+
     pivots = data.get("osint_pivots", {})
     if pivots:
         print_header("Breach & Leak Directory Pivots")

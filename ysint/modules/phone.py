@@ -3,7 +3,7 @@ import os
 import re
 import urllib.parse
 from typing import Dict, Any, Optional, Tuple, List
-from ysint.utils import make_request
+from ysint.utils import make_request, query_public_search
 
 try:
     import phonenumbers
@@ -102,38 +102,6 @@ US_AREA_CODES = {
     "416": ("Toronto, ON (Canada)", "Fixed/Mobile"),
     "604": ("Vancouver, BC (Canada)", "Fixed/Mobile")
 }
-
-def query_public_search(query_str: str, timeout: float = 6.0) -> List[Dict[str, str]]:
-    url = "https://lite.duckduckgo.com/lite/"
-    post_data = urllib.parse.urlencode({"q": query_str}).encode()
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-    status, _, body = make_request(url, headers=headers, timeout=timeout, data=post_data)
-    if status != 200 or not body:
-        return []
-
-    html_text = body.decode("utf-8", errors="replace")
-    links = re.findall(r"<a[^>]+class=['\"]result-link['\"][^>]*href=['\"]([^'\"]+)['\"][^>]*>(.*?)</a>", html_text, re.DOTALL)
-    if not links:
-        links = re.findall(r"<a[^>]+href=['\"]([^'\"]+)['\"][^>]*class=['\"]result-link['\"][^>]*>(.*?)</a>", html_text, re.DOTALL)
-    snippets = re.findall(r"<td class=['\"]result-snippet['\"][^>]*>(.*?)</td>", html_text, re.DOTALL)
-
-    results = []
-    for i in range(min(len(links), len(snippets))):
-        raw_url, raw_title = links[i]
-        raw_snip = snippets[i]
-        clean_title = re.sub(r"<[^>]+>", "", raw_title).strip()
-        clean_title = re.sub(r"\s+", " ", clean_title)
-        clean_snip = re.sub(r"<[^>]+>", "", raw_snip).strip()
-        clean_snip = re.sub(r"\s+", " ", clean_snip)
-        if clean_snip and not any(r["url"] == raw_url for r in results):
-            results.append({
-                "title": clean_title,
-                "url": raw_url,
-                "snippet": clean_snip
-            })
-    return results
 
 def search_public_footprint(e164: str, national: str, timeout: float = 6.0) -> List[Dict[str, str]]:
     general_query = f'"{e164}" OR "{national}"'
