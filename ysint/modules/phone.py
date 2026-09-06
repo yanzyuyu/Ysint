@@ -1,5 +1,16 @@
-﻿import re
-from typing import Dict, Any, Optional, Tuple
+import json
+import os
+import re
+import urllib.parse
+from typing import Dict, Any, Optional, Tuple, List
+from ysint.utils import make_request
+
+try:
+    import phonenumbers
+    from phonenumbers import geocoder, carrier as p_carrier, timezone as p_timezone
+    HAS_LIBPHONENUMBER = True
+except ImportError:
+    HAS_LIBPHONENUMBER = False
 
 COUNTRY_CODES = {
     "1": {"country": "United States / Canada", "code": "US/CA", "region": "North America", "tz": "UTC-4 to UTC-10"},
@@ -64,8 +75,7 @@ ID_CARRIERS = [
     (r"^(31)", "Telkom Indonesia (Surabaya / Sidoarjo)", "Fixed Line"),
     (r"^(361)", "Telkom Indonesia (Denpasar / Bali)", "Fixed Line"),
     (r"^(61)", "Telkom Indonesia (Medan)", "Fixed Line"),
-    (r"^(411)", "Telkom Indonesia (Makassar)", "Fixed Line"),
-    (r"^(1500|140)", "Contact Center / Special Service", "Toll-Free / Premium")
+    (r"^(411)", "Telkom Indonesia (Makassar)", "Fixed Line")
 ]
 
 US_AREA_CODES = {
@@ -92,6 +102,50 @@ US_AREA_CODES = {
     "416": ("Toronto, ON (Canada)", "Fixed/Mobile"),
     "604": ("Vancouver, BC (Canada)", "Fixed/Mobile")
 }
+
+def search_public_footprint(e164: str, national: str, timeout: float = 6.0) -> List[str]:
+    query = f'"{e164}" OR "{national}"'
+    encoded = urllib.parse.quote(query)
+    url = f"https://html.duckduckgo.com/html/?q={encoded}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+    status, _, body = make_request(url, headers=headers, timeout=timeout)
+    if status != 200 or not body:
+        return []
+
+    html_text = body.decode("utf-8", errors="replace")
+    snippets = re.findall(r'<a class="result__snippet[^>]*>(.*?)</a>', html_text, re.DOTALL)
+    results = []
+    for snippet in snippets[:5]:
+        clean_text = re.sub(r"<[^>]+>", "", snippet).strip()
+        clean_text = re.sub(r"\s+", " ", clean_text)
+        if clean_text and clean_text not in results:
+            results.append(clean_text)
+    return results
+
+def check_live_hlr_api(e164: str, api_key: Optional[str] = None, timeout: float = 5.0) -> Optional[Dict[str, Any]]:
+    key = api_key or os.environ.get("NUMVERIFY_API_KEY")
+    if not key:
+        return None
+
+    clean_digits = re.sub(r"\D", "", e164)
+    url = f"http://apilayer.net/api/validate?access_key={key}&number={clean_digits}"
+    status, _, body = make_request(url, timeout=timeout)
+    if status == 200 and body:
+        try:
+            data = json.loads(body.decode("utf-8", errors="replace"))
+            if data.get("valid") is not None:
+                return {
+                    "source": "Numverify Live HLR",
+                    "valid": data.get("valid"),
+                    "carrier": data.get("carrier") or "N/A",
+                    "line_type": data.get("line_type") or "N/A",
+                    "location": data.get("location") or "N/A"
+                }
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
+    return None
 
 def parse_phone_number(raw_input: str) -> Tuple[Optional[str], Optional[str], Optional[Dict[str, str]]]:
     clean = raw_input.strip()
@@ -125,48 +179,7 @@ def parse_phone_number(raw_input: str) -> Tuple[Optional[str], Optional[str], Op
 
     return None, digits, None
 
-def resolve_carrier_and_type(country_code: str, national_num: str) -> Tuple[str, str]:
-    if country_code == "62":
-        for pattern, carrier_name, line_type in ID_CARRIERS:
-            if re.match(pattern, national_num):
-                return carrier_name, line_type
-        return "Indonesian Telecom Provider", "Mobile/Fixed"
-
-    if country_code == "1":
-        prefix3 = national_num[:3]
-        if prefix3 in US_AREA_CODES:
-            loc, ltype = US_AREA_CODES[prefix3]
-            return f"North American Operator ({loc})", ltype
-        return "North American Telecom Operator", "Mobile/Fixed"
-
-    if country_code == "44":
-        if national_num.startswith("7"):
-            return "UK Mobile Network (EE / O2 / Vodafone / Three)", "Mobile"
-        if national_num.startswith("20"):
-            return "BT / UK Fixed Line (London)", "Fixed Line"
-        if national_num.startswith("800") or national_num.startswith("808"):
-            return "UK Freephone Service", "Toll-Free"
-        return "UK Telecom Operator", "Mobile/Fixed"
-
-    if country_code == "60":
-        if re.match(r"^(10|11|12|13|14|16|17|18|19)", national_num):
-            return "Malaysian Mobile Network (Maxis / Celcom / Digi / U Mobile)", "Mobile"
-        if national_num.startswith("3"):
-            return "Telekom Malaysia (KL / Selangor)", "Fixed Line"
-        return "Malaysian Telecom Operator", "Mobile/Fixed"
-
-    if country_code == "65":
-        if re.match(r"^(8|9)", national_num):
-            return "Singapore Mobile (Singtel / StarHub / M1 / Simba)", "Mobile"
-        if national_num.startswith("6"):
-            return "Singapore Fixed Line", "Fixed Line"
-        if national_num.startswith("1800"):
-            return "Singapore Toll-Free", "Toll-Free"
-        return "Singapore Telecom Operator", "Mobile/Fixed"
-
-    return "Regional Telecom Carrier", "Mobile/Fixed"
-
-def scan_phone(phone_input: str) -> Dict[str, Any]:
+def scan_phone(phone_input: str, api_key: Optional[str] = None) -> Dict[str, Any]:
     clean_raw = phone_input.strip()
     digits = re.sub(r"\D", "", clean_raw)
 
@@ -186,36 +199,97 @@ def scan_phone(phone_input: str) -> Dict[str, Any]:
             "message": "Unknown international country calling code"
         }
 
-    carrier, line_type = resolve_carrier_and_type(country_code, national_num)
     e164 = f"+{country_code}{national_num}"
     e164_clean = f"{country_code}{national_num}"
-
     nat_formatted = f"0{national_num}" if country_code == "62" else national_num
+
+    carrier_name = "Regional Telecom Carrier"
+    line_type = "Mobile/Fixed"
+    is_valid = True
+    is_possible = True
+    country_name = country_meta["country"]
+    iso_code = country_meta["code"]
+    tz_info = country_meta["tz"]
+    region_name = country_meta["region"]
+
+    if HAS_LIBPHONENUMBER:
+        try:
+            parsed_obj = phonenumbers.parse(e164, None)
+            is_valid = phonenumbers.is_valid_number(parsed_obj)
+            is_possible = phonenumbers.is_possible_number(parsed_obj)
+            geo_desc = geocoder.description_for_number(parsed_obj, "en")
+            if geo_desc:
+                country_name = geo_desc
+            c_desc = p_carrier.name_for_number(parsed_obj, "en")
+            if c_desc:
+                carrier_name = f"{c_desc} (Google libphonenumber)"
+            tz_list = p_timezone.time_zones_for_number(parsed_obj)
+            if tz_list:
+                tz_info = ", ".join(tz_list)
+            ntype = phonenumbers.number_type(parsed_obj)
+            if ntype == 1:
+                line_type = "Mobile"
+            elif ntype == 0:
+                line_type = "Fixed Line"
+            elif ntype == 3:
+                line_type = "Toll-Free"
+            elif ntype == 2:
+                line_type = "Fixed Line or Mobile"
+        except Exception:
+            pass
+
+    if carrier_name == "Regional Telecom Carrier":
+        if country_code == "62":
+            for pattern, c_name, l_type in ID_CARRIERS:
+                if re.match(pattern, national_num):
+                    carrier_name = c_name
+                    line_type = l_type
+                    break
+        elif country_code == "1":
+            prefix3 = national_num[:3]
+            if prefix3 in US_AREA_CODES:
+                loc, ltype = US_AREA_CODES[prefix3]
+                carrier_name = f"North American Operator ({loc})"
+                line_type = ltype
+
+    live_hlr = check_live_hlr_api(e164, api_key=api_key)
+    if live_hlr and live_hlr.get("carrier") != "N/A":
+        carrier_name = f"{live_hlr['carrier']} (Live HLR)"
+        line_type = live_hlr.get("line_type", line_type)
+
+    footprint_mentions = search_public_footprint(e164, nat_formatted)
 
     whatsapp_link = f"https://wa.me/{e164_clean}"
     telegram_link = f"https://t.me/+{e164_clean}"
     truecaller_link = f"https://www.truecaller.com/search/{country_code}/{national_num}"
+    getcontact_link = f"https://www.getcontact.com/en/search?number={e164_clean}"
     syncme_link = f"https://sync.me/search/?number={e164_clean}"
     google_dork = f'"{e164}" OR "{nat_formatted}"'
+    leaks_dork = f'"{e164}" (site:pastebin.com OR site:trello.com OR site:github.com OR filetype:xls OR filetype:xlsx)'
 
     return {
         "query": clean_raw,
-        "valid": True,
+        "valid": is_valid,
+        "possible": is_possible,
         "e164": e164,
         "national_format": nat_formatted,
         "rfc3966": f"tel:{e164}",
-        "country": country_meta["country"],
-        "country_code": country_meta["code"],
+        "country": country_name,
+        "country_code": iso_code,
         "calling_code": f"+{country_code}",
-        "region": country_meta["region"],
-        "timezone": country_meta["tz"],
-        "carrier": carrier,
+        "region": region_name,
+        "timezone": tz_info,
+        "carrier": carrier_name,
         "line_type": line_type,
+        "live_hlr": live_hlr,
+        "database_footprint": footprint_mentions,
         "osint_pivots": {
             "whatsapp": whatsapp_link,
             "telegram": telegram_link,
             "truecaller": truecaller_link,
+            "getcontact": getcontact_link,
             "syncme": syncme_link,
-            "google_dork": google_dork
+            "google_dork": google_dork,
+            "leaks_dork": leaks_dork
         }
     }

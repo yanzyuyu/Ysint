@@ -178,14 +178,32 @@ def format_phone_report(data: Dict[str, Any]) -> None:
     write_safe(f"  Carrier       : {data.get('carrier')}\n")
     write_safe(f"  Line Type     : {data.get('line_type')}\n")
 
+    live = data.get("live_hlr")
+    if live:
+        print_header("Live HLR Telecom Query")
+        write_safe(f"  Status        : {'Active / Valid' if live.get('valid') else 'Inactive'}\n")
+        write_safe(f"  Network       : {live.get('carrier')}\n")
+        write_safe(f"  Location      : {live.get('location')}\n")
+
+    footprints = data.get("database_footprint", [])
+    print_header("Public Database & Leak Footprint")
+    if footprints:
+        write_safe(f"  {CLR_GREEN}[+] Found {len(footprints)} public web / caller record mentions:{CLR_RESET}\n")
+        for fp in footprints:
+            write_safe(f"    - {fp}\n")
+    else:
+        write_safe(f"  {CLR_YELLOW}[-] No public indexed mentions / leak records found on the open web.{CLR_RESET}\n")
+
     pivots = data.get("osint_pivots", {})
     if pivots:
-        print_header("OSINT Pivots & Footprint Links")
-        write_safe(f"  WhatsApp Direct : {pivots.get('whatsapp')}\n")
-        write_safe(f"  Telegram Direct : {pivots.get('telegram')}\n")
-        write_safe(f"  Truecaller Recon: {pivots.get('truecaller')}\n")
-        write_safe(f"  Sync.ME Lookup  : {pivots.get('syncme')}\n")
-        write_safe(f"  Google Dork     : {pivots.get('google_dork')}\n")
+        print_header("OSINT Pivots & Identity Databases")
+        write_safe(f"  WhatsApp Direct   : {pivots.get('whatsapp')}\n")
+        write_safe(f"  Telegram Direct   : {pivots.get('telegram')}\n")
+        write_safe(f"  Truecaller Recon  : {pivots.get('truecaller')}\n")
+        write_safe(f"  Getcontact Lookup : {pivots.get('getcontact')}\n")
+        write_safe(f"  Sync.ME Directory : {pivots.get('syncme')}\n")
+        write_safe(f"  Google Dork       : {pivots.get('google_dork')}\n")
+        write_safe(f"  Data Leaks Dork   : {pivots.get('leaks_dork')}\n")
 
 def main() -> None:
     parser = argparse.ArgumentParser(

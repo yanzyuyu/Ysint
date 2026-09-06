@@ -1,32 +1,36 @@
 ﻿# Ysint - Modular OSINT Reconnaissance Toolkit
 
-Toolkit Open Source Intelligence (OSINT) berbasis Python Standard Library untuk melakukan footprinting dan reconnaissance terhadap nomor telepon, username, domain, alamat IP, email, dan subdomain secara cepat tanpa dependensi pihak ketiga.
+Toolkit Open Source Intelligence (OSINT) berbasis Python untuk melakukan footprinting dan reconnaissance terhadap nomor telepon, username, domain, alamat IP, email, dan subdomain secara komprehensif dengan dukungan pencarian database jejak publik dan validasi telekomunikasi.
 
 ## Kenapa Ini Dibuat
 
 Investigasi jejak digital (reconnaissance) manual sering membuang waktu operasional: membuka puluhan tab browser satu per satu, mengurai record DNS mentah, menyalin data geolokasi, memetakan prefix nomor telepon internasional secara manual, dan berhadapan dengan false positive akibat respons HTTP soft-404.
 
-Ysint dibangun untuk memberikan ringkasan intelijen yang cepat, akurat, dan dapat langsung diintegrasikan ke dalam pipeline keamanan atau script otomasi melalui output JSON murni.
+Ysint dibangun untuk memberikan ringkasan intelijen yang cepat, akurat, terhubung dengan database telekomunikasi global (Google libphonenumber), dan dapat langsung diintegrasikan ke dalam pipeline keamanan melalui output JSON murni.
 
 ## Cara Kerja (Under the Hood)
 
 - **Smart Auto-Detection**: Subcommand `scan` secara otomatis mengidentifikasi format target (nomor telepon internasional/nasional, IPv4, format email, nama domain, atau handle username) dan menjalankan alur audit yang relevan.
-- **Phone Number Intelligence**: Memetakan kode negara internasional ITU-T E.164, mengidentifikasi operator telekomunikasi dan wilayah seluler/fixed line (Telkomsel, Indosat Ooredoo, XL Axiata, Smartfren, AT&T, UK Networks, dsb.), mengklasifikasikan tipe saluran (Mobile, Fixed Line, Toll-Free), serta membuat pivot link OSINT langsung (WhatsApp, Telegram, Truecaller, Sync.ME, dan Google Dork).
+- **Phone Number Intelligence & Database Footprint**:
+  - Integrasi database telekomunikasi resmi Google (`libphonenumber`) untuk resolusi operator global, validitas format, dan wilayah geografis.
+  - Pencarian jejak database publik (*Public Database & Leak Footprint*) secara realtime dari direktori web, laporan spam/caller publik, dan rekaman kebocoran data.
+  - Dukungan Live HLR API (Numverify) untuk mengecek status keterhubungan kartu SIM di jaringan seluler secara langsung.
+  - Penjanaan pivot link OSINT identitas instan: Truecaller, Getcontact, Sync.ME, WhatsApp Direct, Telegram Direct, dan Google Dork dokumen bocor.
 - **Username Enumeration**: Memindai target secara paralel menggunakan `ThreadPoolExecutor` di belasan platform publik dengan validasi isi respons (bukan sekadar status HTTP 200) untuk mencegah false positive.
 - **Domain & DNS Intelligence**: Mengambil record DNS (A, AAAA, MX, TXT, NS, SOA) via DNS over HTTPS (DoH), menganalisis header keamanan web (HSTS, CSP, X-Frame-Options, X-Content-Type-Options), serta mengecek konfigurasi cipher suite TLS/SSL.
 - **IP Intelligence & ASN**: Mendeteksi rentang IP privat/loopback/reserved secara lokal sebelum memicu jaringan, melakukan Reverse DNS (PTR), serta menarik metadata ASN dan geolokasi publik.
 - **Subdomain Discovery**: Enumerasi konkuren terhadap target subdomain bernilai tinggi dengan kecepatan tinggi menggunakan DNS socket resolver.
 - **Email Verification**: Memvalidasi sintaks RFC, mengecek keberadaan server penampung email (MX records), dan mendeteksi penggunaan domain email sementara (disposable/burner email).
-- **Zero External Dependencies**: Menggunakan pustaka bawaan Python 3 murni sehingga siap dijalankan langsung di server Linux, macOS, maupun Windows tanpa perlu `pip install`.
 
 ## Quickstart & Contoh Penggunaan
 
-Kloning repositori dan jalankan langsung dengan Python 3.8+:
+Kloning repositori dan jalankan langsung:
 
 ```bash
 git clone https://github.com/yanzyuyu/Ysint.git
 cd Ysint
-python main.py scan +6281234567890
+pip install -r requirements.txt
+python main.py scan +628123456789
 ```
 
 ![Terminal Demo](terminal_demo.svg)
@@ -35,18 +39,17 @@ python main.py scan +6281234567890
 
 1. **Auto-Scan (Deteksi Otomatis Target):**
    ```bash
-   python main.py scan +6281234567890
+   python main.py scan +628123456789
    python main.py scan 085712345678
-   python main.py scan target_username
+   python main.py scan yanzyuyu
    python main.py scan 8.8.8.8
    python main.py scan github.com
-   python main.py scan user@example.com
    ```
 
-2. **Phone Number Intelligence:**
+2. **Phone Number Intelligence (Database & Footprint):**
    ```bash
-   python main.py phone +6281234567890
-   python main.py phone 0812-3456-7890
+   python main.py phone +628123456789
+   python main.py phone 083123456789
    python main.py phone +1-415-555-2671
    ```
 
@@ -77,7 +80,7 @@ python main.py scan +6281234567890
 
 8. **Pipeline Automation (Format JSON Murni):**
    ```bash
-   python main.py phone +6281234567890 --json
+   python main.py phone +628123456789 --json
    python main.py scan target --json -o report.json
    ```
 
@@ -88,6 +91,7 @@ ysint/
 ├── .gitignore             # Aturan ignorasi cache dan file sensitif
 ├── main.py                # Entrypoint eksekusi aplikasi
 ├── README.md              # Dokumentasi teknis proyek
+├── requirements.txt       # Dependensi library
 ├── terminal_demo.svg      # Snapshot visual eksekusi terminal
 ├── tests/
 │   ├── __init__.py
@@ -101,7 +105,7 @@ ysint/
         ├── domain.py      # DNS DoH, SSL inspection, security headers
         ├── email.py       # Syntax, MX check, disposable detection
         ├── ip.py          # IP intelligence, ASN, reverse DNS
-        ├── phone.py       # E.164 parsing, operator prefix, OSINT pivots
+        ├── phone.py       # Google libphonenumber, database footprint, OSINT pivots
         ├── subdomain.py   # Resolusi konkruen subdomain
         └── username.py    # Multi-platform username hunting
 ```
