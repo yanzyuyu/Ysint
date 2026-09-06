@@ -62,7 +62,7 @@ $ python main.py phone +628123456789
   Sync.ME Directory : https://sync.me/search/?number=628123456789
 ```
 
-![Terminal Demo](terminal_demo.svg)
+![Terminal Demo](terminal_demo.png)
 
 ### Perintah Utama
 
@@ -121,7 +121,7 @@ ysint/
 ├── main.py                # Entrypoint eksekusi aplikasi
 ├── README.md              # Dokumentasi teknis proyek
 ├── requirements.txt       # Dependensi library
-├── terminal_demo.svg      # Snapshot visual eksekusi terminal
+├── terminal_demo.png      # Snapshot visual eksekusi terminal
 ├── tests/
 │   ├── __init__.py
 │   └── test_modules.py    # Unit test modul OSINT
