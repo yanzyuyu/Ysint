@@ -103,25 +103,47 @@ US_AREA_CODES = {
     "604": ("Vancouver, BC (Canada)", "Fixed/Mobile")
 }
 
-def search_public_footprint(e164: str, national: str, timeout: float = 6.0) -> List[str]:
-    query = f'"{e164}" OR "{national}"'
-    encoded = urllib.parse.quote(query)
-    url = f"https://html.duckduckgo.com/html/?q={encoded}"
+def query_public_search(query_str: str, timeout: float = 6.0) -> List[Dict[str, str]]:
+    url = "https://lite.duckduckgo.com/lite/"
+    post_data = urllib.parse.urlencode({"q": query_str}).encode()
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        "Content-Type": "application/x-www-form-urlencoded"
     }
-    status, _, body = make_request(url, headers=headers, timeout=timeout)
+    status, _, body = make_request(url, headers=headers, timeout=timeout, data=post_data)
     if status != 200 or not body:
         return []
 
     html_text = body.decode("utf-8", errors="replace")
-    snippets = re.findall(r'<a class="result__snippet[^>]*>(.*?)</a>', html_text, re.DOTALL)
+    links = re.findall(r"<a[^>]+class=['\"]result-link['\"][^>]*href=['\"]([^'\"]+)['\"][^>]*>(.*?)</a>", html_text, re.DOTALL)
+    if not links:
+        links = re.findall(r"<a[^>]+href=['\"]([^'\"]+)['\"][^>]*class=['\"]result-link['\"][^>]*>(.*?)</a>", html_text, re.DOTALL)
+    snippets = re.findall(r"<td class=['\"]result-snippet['\"][^>]*>(.*?)</td>", html_text, re.DOTALL)
+
     results = []
-    for snippet in snippets[:5]:
-        clean_text = re.sub(r"<[^>]+>", "", snippet).strip()
-        clean_text = re.sub(r"\s+", " ", clean_text)
-        if clean_text and clean_text not in results:
-            results.append(clean_text)
+    for i in range(min(len(links), len(snippets))):
+        raw_url, raw_title = links[i]
+        raw_snip = snippets[i]
+        clean_title = re.sub(r"<[^>]+>", "", raw_title).strip()
+        clean_title = re.sub(r"\s+", " ", clean_title)
+        clean_snip = re.sub(r"<[^>]+>", "", raw_snip).strip()
+        clean_snip = re.sub(r"\s+", " ", clean_snip)
+        if clean_snip and not any(r["url"] == raw_url for r in results):
+            results.append({
+                "title": clean_title,
+                "url": raw_url,
+                "snippet": clean_snip
+            })
+    return results
+
+def search_public_footprint(e164: str, national: str, timeout: float = 6.0) -> List[Dict[str, str]]:
+    general_query = f'"{e164}" OR "{national}"'
+    results = query_public_search(general_query, timeout=timeout)
+    if len(results) < 3:
+        spam_query = f'"{e164}" OR "{national}" site:kredibel.co.id OR site:tellows.com OR site:shouldianswer.com OR site:whocallsme.com'
+        spam_results = query_public_search(spam_query, timeout=timeout)
+        for sr in spam_results:
+            if not any(r["url"] == sr["url"] for r in results):
+                results.append(sr)
     return results
 
 def check_live_hlr_api(e164: str, api_key: Optional[str] = None, timeout: float = 5.0) -> Optional[Dict[str, Any]]:
@@ -264,8 +286,14 @@ def scan_phone(phone_input: str, api_key: Optional[str] = None) -> Dict[str, Any
     truecaller_link = f"https://www.truecaller.com/search/{country_code}/{national_num}"
     getcontact_link = f"https://www.getcontact.com/en/search?number={e164_clean}"
     syncme_link = f"https://sync.me/search/?number={e164_clean}"
+    kredibel_link = f"https://www.kredibel.co.id/search/phone/{nat_formatted if country_code == '62' else e164_clean}"
+    tellows_link = f"https://www.tellows.com/num/{e164_clean}"
+    shouldianswer_link = f"https://www.shouldianswer.com/phone-number/{e164_clean}"
+    whocallsme_link = f"https://whocallsme.com/Phone-Number.aspx/{e164_clean}"
+    archive_link = f"https://web.archive.org/web/*/{e164}"
     google_dork = f'"{e164}" OR "{nat_formatted}"'
-    leaks_dork = f'"{e164}" (site:pastebin.com OR site:trello.com OR site:github.com OR filetype:xls OR filetype:xlsx)'
+    leaks_dork = f'"{e164}" (site:pastebin.com OR site:trello.com OR site:github.com OR site:t.me)'
+    doc_dork = f'"{e164}" (filetype:pdf OR filetype:xls OR filetype:xlsx OR filetype:csv OR filetype:sql)'
 
     return {
         "query": clean_raw,
@@ -289,7 +317,13 @@ def scan_phone(phone_input: str, api_key: Optional[str] = None) -> Dict[str, Any
             "truecaller": truecaller_link,
             "getcontact": getcontact_link,
             "syncme": syncme_link,
+            "kredibel": kredibel_link,
+            "tellows": tellows_link,
+            "shouldianswer": shouldianswer_link,
+            "whocallsme": whocallsme_link,
+            "archive_org": archive_link,
             "google_dork": google_dork,
-            "leaks_dork": leaks_dork
+            "leaks_dork": leaks_dork,
+            "documents_dork": doc_dork
         }
     }

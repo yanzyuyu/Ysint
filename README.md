@@ -8,19 +8,29 @@ Investigasi jejak digital (reconnaissance) manual sering membuang waktu operasio
 
 Ysint dibangun untuk memberikan ringkasan intelijen yang cepat, akurat, terhubung dengan database telekomunikasi global (Google libphonenumber), dan dapat langsung diintegrasikan ke dalam pipeline keamanan melalui output JSON murni.
 
-## Cara Kerja (Under the Hood)
+## Cara Kerja dan Integrasi Database Publik
 
 - **Smart Auto-Detection**: Subcommand `scan` secara otomatis mengidentifikasi format target (nomor telepon internasional/nasional, IPv4, format email, nama domain, atau handle username) dan menjalankan alur audit yang relevan.
-- **Phone Number Intelligence & Database Footprint**:
-  - Integrasi database telekomunikasi resmi Google (`libphonenumber`) untuk resolusi operator global, validitas format, dan wilayah geografis.
-  - Pencarian jejak database publik (*Public Database & Leak Footprint*) secara realtime dari direktori web, laporan spam/caller publik, dan rekaman kebocoran data.
-  - Dukungan Live HLR API (Numverify) untuk mengecek status keterhubungan kartu SIM di jaringan seluler secara langsung.
-  - Penjanaan pivot link OSINT identitas instan: Truecaller, Getcontact, Sync.ME, WhatsApp Direct, Telegram Direct, dan Google Dork dokumen bocor.
-- **Username Enumeration**: Memindai target secara paralel menggunakan `ThreadPoolExecutor` di belasan platform publik dengan validasi isi respons (bukan sekadar status HTTP 200) untuk mencegah false positive.
-- **Domain & DNS Intelligence**: Mengambil record DNS (A, AAAA, MX, TXT, NS, SOA) via DNS over HTTPS (DoH), menganalisis header keamanan web (HSTS, CSP, X-Frame-Options, X-Content-Type-Options), serta mengecek konfigurasi cipher suite TLS/SSL.
-- **IP Intelligence & ASN**: Mendeteksi rentang IP privat/loopback/reserved secara lokal sebelum memicu jaringan, melakukan Reverse DNS (PTR), serta menarik metadata ASN dan geolokasi publik.
-- **Subdomain Discovery**: Enumerasi konkuren terhadap target subdomain bernilai tinggi dengan kecepatan tinggi menggunakan DNS socket resolver.
-- **Email Verification**: Memvalidasi sintaks RFC, mengecek keberadaan server penampung email (MX records), dan mendeteksi penggunaan domain email sementara (disposable/burner email).
+- **Phone Intelligence & Caller / Fraud Database Footprint**:
+  - Integrasi database telekomunikasi resmi Google (`libphonenumber`) untuk resolusi operator global, validitas format ITU-T E.164, dan zona waktu.
+  - Pencarian jejak database publik realtime dari direktori web, database penipuan (Kredibel.co.id), laporan caller spam (Tellows, ShouldIAnswer, UnknownPhone, Whocallsme), dan rekaman kebocoran data.
+  - Dukungan Live HLR API (Numverify) untuk mengecek status kartu SIM aktif di jaringan seluler.
+  - Penjanaan pivot link OSINT identitas instan: Truecaller, Getcontact, Sync.ME, Kredibel, WhatsApp Direct, Telegram Direct, Archive.org, dan Google Dorks (dokumen dan kebocoran data).
+- **Subdomain Discovery via Certificate Transparency & Passive DNS**:
+  - Mengintegrasikan database log Certificate Transparency (crt.sh) global dan HackerTarget HostSearch database untuk memetakan subdomain riil dari sertifikat SSL/TLS yang pernah diterbitkan.
+  - Dikombinasikan dengan probing aktif DNS berbasis wordlist bernilai tinggi (120+ entri) dan resolusi konkruen untuk memvalidasi IP aktif.
+- **Co-Hosted Domain Database & IP Intelligence**:
+  - Database Reverse IP HackerTarget untuk mendeteksi domain-domain lain yang di-hosting pada alamat IP server target yang sama (shared hosting footprint).
+  - Geolokasi presisi, ASN, ISP, organisasi pemilik IP, dan tautan pivot intelijen ancaman (Shodan, Censys, AbuseIPDB, GreyNoise, VirusTotal, BGP Route).
+- **Public Keyring & Identity Database for Email**:
+  - Query ke direktori publik Ubuntu OpenPGP Keyring untuk mengekstraksi PGP Key ID, panjang bit kunci, dan tautan verifikasi identitas pengunggah kunci.
+  - Validasi profil identitas Gravatar via hash kriptografis untuk mendeteksi keberadaan avatar dan akun publik terdaftar.
+  - Database pengecekan domain disposable/burner email (80+ penyedia throwaway) dan validasi server penampung email (MX records).
+- **Domain & RDAP Public Registry Recon**:
+  - Penarikan metadata pendaftaran resmi ICANN via RDAP (Registrar, tanggal registrasi, tanggal kedaluwarsa).
+  - Record DNS lengkap (A, AAAA, MX, TXT, NS, SOA) via DNS over HTTPS (DoH), inspeksi TLS/SSL cipher, dan audit header keamanan (HSTS, CSP, X-Frame-Options).
+- **Multi-Platform Username Reconnaissance**:
+  - Memindai target secara konkuren di 23+ platform publik (GitHub, GitLab, DockerHub, Dev.to, HackerNews, Keybase, Steam, Rubygems, Packagist, About.me, Disqus, Bandcamp, Letterboxd, IFTTT, Chess.com, Codeforces, Duolingo, Replit, Gravatar, Pastebin, dll.) dengan validasi isi respons untuk mencegah false positive.
 
 ## Quickstart & Contoh Penggunaan
 

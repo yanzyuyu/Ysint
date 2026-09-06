@@ -92,6 +92,54 @@ PLATFORM_TARGETS = [
         "probe": "https://www.duolingo.com/2017-06-30/users?username={u}",
         "profile": "https://www.duolingo.com/profile/{u}",
         "validator": lambda s, h, b: s == 200 and b'"users":[]' not in b
+    },
+    {
+        "name": "Steam",
+        "probe": "https://steamcommunity.com/id/{u}",
+        "profile": "https://steamcommunity.com/id/{u}",
+        "validator": lambda s, h, b: s == 200 and b"The specified profile could not be found" not in b
+    },
+    {
+        "name": "Rubygems",
+        "probe": "https://rubygems.org/profiles/{u}",
+        "profile": "https://rubygems.org/profiles/{u}",
+        "validator": lambda s, h, b: s == 200
+    },
+    {
+        "name": "Packagist",
+        "probe": "https://packagist.org/users/{u}/",
+        "profile": "https://packagist.org/users/{u}/",
+        "validator": lambda s, h, b: s == 200
+    },
+    {
+        "name": "About.me",
+        "probe": "https://about.me/{u}",
+        "profile": "https://about.me/{u}",
+        "validator": lambda s, h, b: s == 200
+    },
+    {
+        "name": "Disqus",
+        "probe": "https://disqus.com/by/{u}/",
+        "profile": "https://disqus.com/by/{u}/",
+        "validator": lambda s, h, b: s == 200
+    },
+    {
+        "name": "Bandcamp",
+        "probe": "https://bandcamp.com/{u}",
+        "profile": "https://bandcamp.com/{u}",
+        "validator": lambda s, h, b: s == 200
+    },
+    {
+        "name": "Letterboxd",
+        "probe": "https://letterboxd.com/{u}/",
+        "profile": "https://letterboxd.com/{u}/",
+        "validator": lambda s, h, b: s == 200
+    },
+    {
+        "name": "IFTTT",
+        "probe": "https://ifttt.com/p/{u}",
+        "profile": "https://ifttt.com/p/{u}",
+        "validator": lambda s, h, b: s == 200
     }
 ]
 
@@ -124,5 +172,11 @@ def scan_username(username: str, timeout: float = 5.0, max_workers: int = 10) ->
         "target": clean_username,
         "total_probed": len(results),
         "total_found": len(found_profiles),
-        "profiles": results
+        "profiles": results,
+        "osint_pivots": {
+            "whatsmyname": "https://whatsmyname.app/",
+            "namechk": "https://namechk.com/",
+            "google_dork": f'"{clean_username}" (site:twitter.com OR site:instagram.com OR site:linkedin.com)',
+            "leaks_dork": f'"{clean_username}" (site:pastebin.com OR site:trello.com OR filetype:txt)'
+        }
     }

@@ -14,14 +14,20 @@ def build_ssl_context() -> ssl.SSLContext:
     except Exception:
         return ssl._create_unverified_context()
 
-def make_request(url: str, headers: Optional[Dict[str, str]] = None, timeout: float = 5.0) -> Tuple[int, Dict[str, str], bytes]:
+def make_request(
+    url: str,
+    headers: Optional[Dict[str, str]] = None,
+    timeout: float = 5.0,
+    data: Optional[bytes] = None,
+    method: Optional[str] = None
+) -> Tuple[int, Dict[str, str], bytes]:
     req_headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         "Accept": "*/*"
     }
     if headers:
         req_headers.update(headers)
-    req = urllib.request.Request(url, headers=req_headers)
+    req = urllib.request.Request(url, data=data, headers=req_headers, method=method)
     ctx = build_ssl_context()
     try:
         with urllib.request.urlopen(req, context=ctx, timeout=timeout) as resp:

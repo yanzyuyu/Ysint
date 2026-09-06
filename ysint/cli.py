@@ -45,9 +45,16 @@ def format_user_report(data: Dict[str, Any]) -> None:
     write_safe(f"Probed: {data['total_probed']} platforms | Found: {data['total_found']} active accounts\n\n")
     for profile in data["profiles"]:
         if profile["found"]:
-            write_safe(f"  {CLR_GREEN}[FOUND]{CLR_RESET} {profile['platform']:<12} : {profile['url']}\n")
+            write_safe(f"  {CLR_GREEN}[FOUND]{CLR_RESET} {profile['platform']:<14} : {profile['url']}\n")
         else:
-            write_safe(f"  {CLR_RED}[NOT FOUND]{CLR_RESET} {profile['platform']:<12}\n")
+            write_safe(f"  {CLR_RED}[NOT FOUND]{CLR_RESET} {profile['platform']:<14}\n")
+
+    pivots = data.get("osint_pivots", {})
+    if pivots:
+        print_header("Identity & Footprint Pivots")
+        for pk, pv in pivots.items():
+            label = pk.replace("_", " ").title()
+            write_safe(f"  {label:<18}: {pv}\n")
 
 def format_ip_report(data: Dict[str, Any]) -> None:
     print_header(f"IP Intelligence: {data.get('query')}")
@@ -70,6 +77,18 @@ def format_ip_report(data: Dict[str, Any]) -> None:
     else:
         print_badge("fail", f"Could not retrieve geolocation: {data.get('message', 'Unknown error')}")
 
+    co_hosted = data.get("co_hosted_domains", [])
+    if co_hosted:
+        print_header(f"Co-Hosted Public Domains Database ({len(co_hosted)})")
+        for ch in co_hosted[:12]:
+            write_safe(f"  - {ch}\n")
+
+    threats = data.get("threat_pivots", {})
+    if threats:
+        print_header("Threat Intelligence & Scanner Pivots")
+        for tk, tv in threats.items():
+            write_safe(f"  {tk.upper():<14}: {tv}\n")
+
 def format_domain_report(data: Dict[str, Any]) -> None:
     print_header(f"Domain Recon: {data['domain']}")
     if data["ipv4"]:
@@ -80,6 +99,16 @@ def format_domain_report(data: Dict[str, Any]) -> None:
     geo = data.get("primary_geo")
     if geo and geo.get("status") == "success":
         write_safe(f"  Server Location: {geo.get('city')}, {geo.get('country')} ({geo.get('isp')})\n")
+
+    rdap = data.get("rdap")
+    if rdap:
+        print_header("Public RDAP Registry Metadata")
+        if rdap.get("registrar"):
+            write_safe(f"  Registrar   : {rdap.get('registrar')}\n")
+        if rdap.get("created"):
+            write_safe(f"  Registered  : {rdap.get('created')}\n")
+        if rdap.get("expires"):
+            write_safe(f"  Expires     : {rdap.get('expires')}\n")
 
     ssl_info = data.get("ssl", {})
     if ssl_info.get("enabled"):
@@ -110,6 +139,13 @@ def format_domain_report(data: Dict[str, Any]) -> None:
         for hk in missing:
             write_safe(f"    {CLR_YELLOW}-{CLR_RESET} {hk}\n")
 
+    pivots = data.get("osint_pivots", {})
+    if pivots:
+        print_header("OSINT Pivots & Threat Intelligence")
+        for pk, pv in pivots.items():
+            label = pk.replace("_", " ").upper()
+            write_safe(f"  {label:<16}: {pv}\n")
+
 def format_email_report(data: Dict[str, Any]) -> None:
     print_header(f"Email Intelligence: {data.get('email')}")
     if not data.get("valid_syntax"):
@@ -132,11 +168,30 @@ def format_email_report(data: Dict[str, Any]) -> None:
     else:
         print_badge("warn", "No MX records found for domain.")
 
+    pgp_keys = data.get("pgp_keys", [])
+    if pgp_keys:
+        print_header(f"Ubuntu OpenPGP Public Keyring ({len(pgp_keys)} keys found)")
+        for k in pgp_keys[:5]:
+            write_safe(f"  {CLR_GREEN}[+]{CLR_RESET} Key ID: 0x{k.get('key_id')} ({k.get('bits')} bits) -> {k.get('view_url')}\n")
+
+    gravatar = data.get("gravatar", {})
+    if gravatar.get("registered"):
+        print_header("Gravatar Public Identity Database")
+        write_safe(f"  {CLR_GREEN}[+]{CLR_RESET} Registered Profile Avatar: {gravatar.get('avatar_url')}\n")
+
+    pivots = data.get("osint_pivots", {})
+    if pivots:
+        print_header("Breach & Leak Directory Pivots")
+        for pk, pv in pivots.items():
+            label = pk.replace("_", " ").title()
+            write_safe(f"  {label:<18}: {pv}\n")
+
 def format_subdomains_report(data: Dict[str, Any]) -> None:
     print_header(f"Subdomain Discovery: {data['domain']}")
-    write_safe(f"Scanned: {data['total_probed']} wordlist targets | Active: {data['total_found']} subdomains\n\n")
+    write_safe(f"Scanned: {data['total_probed']} targets | Discovered: {data['total_found']} active subdomains\n\n")
     for sub in data["subdomains"]:
-        write_safe(f"  {CLR_GREEN}[LIVE]{CLR_RESET} {sub['fqdn']:<30} -> {sub['ip']}\n")
+        src = f"[{sub.get('source', 'DNS')}]"
+        write_safe(f"  {CLR_GREEN}[LIVE]{CLR_RESET} {sub['fqdn']:<35} -> {str(sub.get('ip')):<16} {src}\n")
 
 def run_auto_scan(target: str, timeout: float, quiet: bool = False) -> Dict[str, Any]:
     clean = target.strip()
@@ -188,22 +243,23 @@ def format_phone_report(data: Dict[str, Any]) -> None:
     footprints = data.get("database_footprint", [])
     print_header("Public Database & Leak Footprint")
     if footprints:
-        write_safe(f"  {CLR_GREEN}[+] Found {len(footprints)} public web / caller record mentions:{CLR_RESET}\n")
-        for fp in footprints:
-            write_safe(f"    - {fp}\n")
+        write_safe(f"  {CLR_GREEN}[+] Found {len(footprints)} public database / caller records:{CLR_RESET}\n")
+        for idx, fp in enumerate(footprints, 1):
+            if isinstance(fp, dict):
+                write_safe(f"    [{idx}] {fp.get('title')}\n")
+                write_safe(f"        URL    : {fp.get('url')}\n")
+                write_safe(f"        Details: {fp.get('snippet')}\n")
+            else:
+                write_safe(f"    [{idx}] {fp}\n")
     else:
         write_safe(f"  {CLR_YELLOW}[-] No public indexed mentions / leak records found on the open web.{CLR_RESET}\n")
 
     pivots = data.get("osint_pivots", {})
     if pivots:
         print_header("OSINT Pivots & Identity Databases")
-        write_safe(f"  WhatsApp Direct   : {pivots.get('whatsapp')}\n")
-        write_safe(f"  Telegram Direct   : {pivots.get('telegram')}\n")
-        write_safe(f"  Truecaller Recon  : {pivots.get('truecaller')}\n")
-        write_safe(f"  Getcontact Lookup : {pivots.get('getcontact')}\n")
-        write_safe(f"  Sync.ME Directory : {pivots.get('syncme')}\n")
-        write_safe(f"  Google Dork       : {pivots.get('google_dork')}\n")
-        write_safe(f"  Data Leaks Dork   : {pivots.get('leaks_dork')}\n")
+        for pk, pv in pivots.items():
+            label = pk.replace("_", " ").title()
+            write_safe(f"  {label:<18}: {pv}\n")
 
 def main() -> None:
     parser = argparse.ArgumentParser(

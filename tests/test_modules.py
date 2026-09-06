@@ -54,6 +54,9 @@ class TestYsintModules(unittest.TestCase):
         normal = scan_email("contact@github.com", timeout=3.0)
         self.assertTrue(normal["valid_syntax"])
         self.assertFalse(normal["is_disposable"])
+        self.assertIn("pgp_keys", normal)
+        self.assertIn("gravatar", normal)
+        self.assertIn("osint_pivots", normal)
 
     def test_subdomain_resolution_schema(self):
         res = resolve_target("www", "google.com")
@@ -69,6 +72,7 @@ class TestYsintModules(unittest.TestCase):
         self.assertIn("total_probed", res)
         self.assertIn("total_found", res)
         self.assertIsInstance(res["profiles"], list)
+        self.assertIn("osint_pivots", res)
 
     def test_phone_intelligence(self):
         id_mobile = scan_phone("+6281234567890")
@@ -78,6 +82,8 @@ class TestYsintModules(unittest.TestCase):
         self.assertEqual(id_mobile["line_type"], "Mobile")
         self.assertIn("Telkomsel", id_mobile["carrier"])
         self.assertIn("whatsapp", id_mobile["osint_pivots"])
+        self.assertIn("kredibel", id_mobile["osint_pivots"])
+        self.assertIn("tellows", id_mobile["osint_pivots"])
 
         nat_mobile = scan_phone("085712345678")
         self.assertTrue(nat_mobile["valid"])

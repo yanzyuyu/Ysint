@@ -1,4 +1,4 @@
-﻿import json
+import json
 import socket
 import ssl
 from typing import Dict, List, Any, Optional
@@ -79,6 +79,34 @@ def inspect_ssl_tls(domain: str, timeout: float = 5.0) -> Dict[str, Any]:
             "bits": None
         }
 
+def lookup_domain_rdap(domain: str, timeout: float = 6.0) -> Optional[Dict[str, Any]]:
+    url = f"https://rdap.org/domain/{domain}"
+    status, _, body = make_request(url, timeout=timeout)
+    if status == 200 and body:
+        try:
+            data = json.loads(body.decode("utf-8", errors="replace"))
+            events = {e.get("eventAction"): e.get("eventDate") for e in data.get("events", []) if e.get("eventAction")}
+            registrar = None
+            for ent in data.get("entities", []):
+                if "registrar" in ent.get("roles", []):
+                    vcard = ent.get("vcardArray", [[]])
+                    if len(vcard) > 1:
+                        for field in vcard[1]:
+                            if field[0] == "fn" and len(field) > 3:
+                                registrar = field[3]
+                                break
+                if registrar:
+                    break
+            return {
+                "registrar": registrar,
+                "created": events.get("registration"),
+                "expires": events.get("expiration"),
+                "updated": events.get("last changed")
+            }
+        except Exception:
+            pass
+    return None
+
 def scan_domain(domain_str: str, timeout: float = 5.0) -> Dict[str, Any]:
     clean_domain = domain_str.strip().lower()
     if clean_domain.startswith("https://"):
@@ -105,13 +133,23 @@ def scan_domain(domain_str: str, timeout: float = 5.0) -> Dict[str, Any]:
     dns_records = resolve_dns_records(clean_domain, timeout=timeout)
     sec_headers = check_security_headers(clean_domain, timeout=timeout)
     ssl_info = inspect_ssl_tls(clean_domain, timeout=timeout)
+    rdap_info = lookup_domain_rdap(clean_domain, timeout=timeout)
 
     return {
         "domain": clean_domain,
         "ipv4": ipv4_addrs,
         "ipv6": ipv6_addrs,
         "primary_geo": geo_ip,
+        "rdap": rdap_info,
         "dns": dns_records,
         "ssl": ssl_info,
-        "security_headers": sec_headers
+        "security_headers": sec_headers,
+        "osint_pivots": {
+            "crt_sh": f"https://crt.sh/?q=%.{clean_domain}",
+            "urlscan": f"https://urlscan.io/domain/{clean_domain}",
+            "virustotal": f"https://www.virustotal.com/gui/domain/{clean_domain}",
+            "shodan": f"https://www.shodan.io/search?query=hostname%3A{clean_domain}",
+            "archive_org": f"https://web.archive.org/web/*/{clean_domain}",
+            "otx_alienvault": f"https://otx.alienvault.com/indicator/domain/{clean_domain}"
+        }
     }
