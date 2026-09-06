@@ -1,9 +1,10 @@
-﻿import unittest
-from ysint.utils import is_ipv4, is_domain, is_email
+import unittest
+from ysint.utils import is_ipv4, is_domain, is_email, is_phone_number
 from ysint.modules.ip import scan_ip
 from ysint.modules.email import scan_email
 from ysint.modules.subdomain import resolve_target
 from ysint.modules.username import scan_username
+from ysint.modules.phone import scan_phone
 
 class TestYsintModules(unittest.TestCase):
 
@@ -12,6 +13,12 @@ class TestYsintModules(unittest.TestCase):
         self.assertTrue(is_ipv4("192.168.1.50"))
         self.assertFalse(is_ipv4("github.com"))
         self.assertFalse(is_ipv4("999.999.999.999"))
+
+        self.assertTrue(is_phone_number("+6281234567890"))
+        self.assertTrue(is_phone_number("081234567890"))
+        self.assertTrue(is_phone_number("+1-800-555-0199"))
+        self.assertFalse(is_phone_number("yanzyuyu"))
+        self.assertFalse(is_phone_number("hello@domain.com"))
 
         self.assertTrue(is_domain("github.com"))
         self.assertTrue(is_domain("sub.domain.co.id"))
@@ -62,6 +69,28 @@ class TestYsintModules(unittest.TestCase):
         self.assertIn("total_probed", res)
         self.assertIn("total_found", res)
         self.assertIsInstance(res["profiles"], list)
+
+    def test_phone_intelligence(self):
+        id_mobile = scan_phone("+6281234567890")
+        self.assertTrue(id_mobile["valid"])
+        self.assertEqual(id_mobile["country"], "Indonesia")
+        self.assertEqual(id_mobile["calling_code"], "+62")
+        self.assertEqual(id_mobile["line_type"], "Mobile")
+        self.assertIn("Telkomsel", id_mobile["carrier"])
+        self.assertIn("whatsapp", id_mobile["osint_pivots"])
+
+        nat_mobile = scan_phone("085712345678")
+        self.assertTrue(nat_mobile["valid"])
+        self.assertEqual(nat_mobile["e164"], "+6285712345678")
+        self.assertIn("Indosat", nat_mobile["carrier"])
+
+        us_num = scan_phone("+1-415-555-2671")
+        self.assertTrue(us_num["valid"])
+        self.assertEqual(us_num["calling_code"], "+1")
+        self.assertIn("San Francisco", us_num["carrier"])
+
+        invalid = scan_phone("123")
+        self.assertFalse(invalid["valid"])
 
 if __name__ == "__main__":
     unittest.main()

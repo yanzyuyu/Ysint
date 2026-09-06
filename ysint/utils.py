@@ -1,4 +1,4 @@
-﻿import ipaddress
+import ipaddress
 import re
 import ssl
 import sys
@@ -56,3 +56,20 @@ def is_domain(target: str) -> bool:
 def is_email(target: str) -> bool:
     pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
     return bool(re.match(pattern, target.strip()))
+
+def is_phone_number(target: str) -> bool:
+    clean = target.strip()
+    if any(c.isalpha() for c in clean):
+        return False
+    digits = re.sub(r"\D", "", clean)
+    if len(digits) < 7 or len(digits) > 15:
+        return False
+    if clean.startswith("+"):
+        return True
+    if clean.startswith("08") and 10 <= len(digits) <= 13:
+        return True
+    if any(c in clean for c in "-. ()"):
+        return True
+    if clean.startswith("0") and 9 <= len(digits) <= 14:
+        return True
+    return 10 <= len(digits) <= 15

@@ -2,12 +2,13 @@ import argparse
 import json
 import sys
 from typing import Dict, Any, List
-from ysint.utils import is_ipv4, is_domain, is_email, write_safe
+from ysint.utils import is_ipv4, is_domain, is_email, is_phone_number, write_safe
 from ysint.modules.username import scan_username
 from ysint.modules.ip import scan_ip
 from ysint.modules.domain import scan_domain
 from ysint.modules.email import scan_email
 from ysint.modules.subdomain import scan_subdomains
+from ysint.modules.phone import scan_phone
 
 CLR_CYAN = "\033[96m"
 CLR_GREEN = "\033[92m"
@@ -147,6 +148,10 @@ def run_auto_scan(target: str, timeout: float, quiet: bool = False) -> Dict[str,
         if not quiet:
             print_badge("info", f"Target detected as Email Address: {clean}")
         return {"mode": "email", "result": scan_email(clean, timeout=timeout)}
+    elif is_phone_number(clean):
+        if not quiet:
+            print_badge("info", f"Target detected as Phone Number: {clean}")
+        return {"mode": "phone", "result": scan_phone(clean)}
     elif is_domain(clean):
         if not quiet:
             print_badge("info", f"Target detected as Domain: {clean}")
@@ -157,6 +162,30 @@ def run_auto_scan(target: str, timeout: float, quiet: bool = False) -> Dict[str,
         if not quiet:
             print_badge("info", f"Target detected as Username/Handle: {clean}")
         return {"mode": "user", "result": scan_username(clean, timeout=timeout)}
+
+def format_phone_report(data: Dict[str, Any]) -> None:
+    print_header(f"Phone Intelligence: {data.get('query')}")
+    if not data.get("valid"):
+        print_badge("fail", data.get("message", "Invalid telephone number format."))
+        return
+
+    write_safe(f"  International : {data.get('e164')}\n")
+    write_safe(f"  National      : {data.get('national_format')}\n")
+    write_safe(f"  Country       : {data.get('country')} ({data.get('country_code')})\n")
+    write_safe(f"  Calling Code  : {data.get('calling_code')}\n")
+    write_safe(f"  Region        : {data.get('region')}\n")
+    write_safe(f"  Timezone      : {data.get('timezone')}\n")
+    write_safe(f"  Carrier       : {data.get('carrier')}\n")
+    write_safe(f"  Line Type     : {data.get('line_type')}\n")
+
+    pivots = data.get("osint_pivots", {})
+    if pivots:
+        print_header("OSINT Pivots & Footprint Links")
+        write_safe(f"  WhatsApp Direct : {pivots.get('whatsapp')}\n")
+        write_safe(f"  Telegram Direct : {pivots.get('telegram')}\n")
+        write_safe(f"  Truecaller Recon: {pivots.get('truecaller')}\n")
+        write_safe(f"  Sync.ME Lookup  : {pivots.get('syncme')}\n")
+        write_safe(f"  Google Dork     : {pivots.get('google_dork')}\n")
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -183,7 +212,10 @@ def main() -> None:
     sub_parser = subparsers.add_parser("subdomains", help="Enumerate active subdomains")
     sub_parser.add_argument("domain", help="Base domain to enumerate")
 
-    for p in [scan_parser, user_parser, ip_parser, domain_parser, email_parser, sub_parser]:
+    phone_parser = subparsers.add_parser("phone", help="Investigate phone number carrier, country, and OSINT pivots")
+    phone_parser.add_argument("number", help="Phone number to inspect")
+
+    for p in [scan_parser, user_parser, ip_parser, domain_parser, email_parser, sub_parser, phone_parser]:
         p.add_argument("--json", action="store_true", help="Output raw JSON data")
         p.add_argument("--timeout", type=float, default=5.0, help="Request timeout in seconds (default: 5.0)")
         p.add_argument("-o", "--output", help="Save result to a file")
@@ -211,6 +243,8 @@ def main() -> None:
                 format_ip_report(data["result"])
             elif mode == "email":
                 format_email_report(data["result"])
+            elif mode == "phone":
+                format_phone_report(data["result"])
             elif mode == "domain":
                 format_domain_report(data["result"])
                 format_subdomains_report(data["subdomains"])
@@ -256,6 +290,14 @@ def main() -> None:
         result_data = res
         if not is_json_mode:
             format_subdomains_report(res)
+
+    elif args.command == "phone":
+        if not is_json_mode:
+            print_badge("info", f"Inspecting phone number '{args.number}'...")
+        res = scan_phone(args.number)
+        result_data = res
+        if not is_json_mode:
+            format_phone_report(res)
 
     if is_json_mode and result_data:
         json_output = json.dumps(result_data, indent=2)

@@ -1,16 +1,17 @@
 ﻿# Ysint - Modular OSINT Reconnaissance Toolkit
 
-Toolkit Open Source Intelligence (OSINT) berbasis Python Standard Library untuk melakukan footprinting dan reconnaissance terhadap username, domain, alamat IP, email, dan subdomain secara cepat tanpa dependensi pihak ketiga.
+Toolkit Open Source Intelligence (OSINT) berbasis Python Standard Library untuk melakukan footprinting dan reconnaissance terhadap nomor telepon, username, domain, alamat IP, email, dan subdomain secara cepat tanpa dependensi pihak ketiga.
 
 ## Kenapa Ini Dibuat
 
-Investigasi jejak digital (reconnaissance) manual sering membuang waktu operasional: membuka puluhan tab browser satu per satu, mengurai record DNS mentah, menyalin data geolokasi, dan berhadapan dengan false positive akibat respons HTTP soft-404.
+Investigasi jejak digital (reconnaissance) manual sering membuang waktu operasional: membuka puluhan tab browser satu per satu, mengurai record DNS mentah, menyalin data geolokasi, memetakan prefix nomor telepon internasional secara manual, dan berhadapan dengan false positive akibat respons HTTP soft-404.
 
 Ysint dibangun untuk memberikan ringkasan intelijen yang cepat, akurat, dan dapat langsung diintegrasikan ke dalam pipeline keamanan atau script otomasi melalui output JSON murni.
 
 ## Cara Kerja (Under the Hood)
 
-- **Smart Auto-Detection**: Subcommand `scan` secara otomatis mengidentifikasi format target (IPv4, format email, nama domain, atau handle username) dan menjalankan alur audit yang relevan.
+- **Smart Auto-Detection**: Subcommand `scan` secara otomatis mengidentifikasi format target (nomor telepon internasional/nasional, IPv4, format email, nama domain, atau handle username) dan menjalankan alur audit yang relevan.
+- **Phone Number Intelligence**: Memetakan kode negara internasional ITU-T E.164, mengidentifikasi operator telekomunikasi dan wilayah seluler/fixed line (Telkomsel, Indosat Ooredoo, XL Axiata, Smartfren, AT&T, UK Networks, dsb.), mengklasifikasikan tipe saluran (Mobile, Fixed Line, Toll-Free), serta membuat pivot link OSINT langsung (WhatsApp, Telegram, Truecaller, Sync.ME, dan Google Dork).
 - **Username Enumeration**: Memindai target secara paralel menggunakan `ThreadPoolExecutor` di belasan platform publik dengan validasi isi respons (bukan sekadar status HTTP 200) untuk mencegah false positive.
 - **Domain & DNS Intelligence**: Mengambil record DNS (A, AAAA, MX, TXT, NS, SOA) via DNS over HTTPS (DoH), menganalisis header keamanan web (HSTS, CSP, X-Frame-Options, X-Content-Type-Options), serta mengecek konfigurasi cipher suite TLS/SSL.
 - **IP Intelligence & ASN**: Mendeteksi rentang IP privat/loopback/reserved secara lokal sebelum memicu jaringan, melakukan Reverse DNS (PTR), serta menarik metadata ASN dan geolokasi publik.
@@ -25,7 +26,7 @@ Kloning repositori dan jalankan langsung dengan Python 3.8+:
 ```bash
 git clone https://github.com/yanzyuyu/Ysint.git
 cd Ysint
-python main.py scan yanzyuyu
+python main.py scan +6281234567890
 ```
 
 ![Terminal Demo](terminal_demo.svg)
@@ -34,40 +35,49 @@ python main.py scan yanzyuyu
 
 1. **Auto-Scan (Deteksi Otomatis Target):**
    ```bash
+   python main.py scan +6281234567890
+   python main.py scan 085712345678
    python main.py scan target_username
    python main.py scan 8.8.8.8
    python main.py scan github.com
    python main.py scan user@example.com
    ```
 
-2. **Username Recon:**
+2. **Phone Number Intelligence:**
+   ```bash
+   python main.py phone +6281234567890
+   python main.py phone 0812-3456-7890
+   python main.py phone +1-415-555-2671
+   ```
+
+3. **Username Recon:**
    ```bash
    python main.py user yanzyuyu
    ```
 
-3. **Domain Intelligence:**
+4. **Domain Intelligence:**
    ```bash
    python main.py domain github.com
    ```
 
-4. **Subdomain Enumeration:**
+5. **Subdomain Enumeration:**
    ```bash
    python main.py subdomains github.com
    ```
 
-5. **IP Intelligence:**
+6. **IP Intelligence:**
    ```bash
    python main.py ip 1.1.1.1
    ```
 
-6. **Email Analysis:**
+7. **Email Analysis:**
    ```bash
    python main.py email test@mailinator.com
    ```
 
-7. **Pipeline Automation (Format JSON Murni):**
+8. **Pipeline Automation (Format JSON Murni):**
    ```bash
-   python main.py ip 1.1.1.1 --json
+   python main.py phone +6281234567890 --json
    python main.py scan target --json -o report.json
    ```
 
@@ -91,6 +101,7 @@ ysint/
         ├── domain.py      # DNS DoH, SSL inspection, security headers
         ├── email.py       # Syntax, MX check, disposable detection
         ├── ip.py          # IP intelligence, ASN, reverse DNS
+        ├── phone.py       # E.164 parsing, operator prefix, OSINT pivots
         ├── subdomain.py   # Resolusi konkruen subdomain
         └── username.py    # Multi-platform username hunting
 ```
